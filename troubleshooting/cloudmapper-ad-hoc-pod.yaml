@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cloudmapper
+  namespace: cloudmapper
+  labels:
+    app: cloudmapper
+spec:
+  containers:
+  - name: cloudmapper-pod
+    image: "01234567890.dkr.ecr.us-west-2.amazonaws.com/k8s/manheim-cloudmapper:0.2.5"
+    envFrom:
+      - configMapRef:
+          name: "cloudmapper-config"
+      - secretRef:
+          name: "cloudmapper-secrets"
+    command: ["/bin/bash"]
+    args: ["-c", "while true; do echo hello; sleep 10;done"]
+  restartPolicy: OnFailure

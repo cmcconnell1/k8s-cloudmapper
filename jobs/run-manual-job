@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+# run add-hoc job once
+kubectl apply -f ./job.yaml -n cloudmapper

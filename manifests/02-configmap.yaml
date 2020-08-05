@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "cloudmapper-config"
+  namespace: "cloudmapper"
+  labels:
+    app: "cloudmapper"
+    release: "0.2.5"
+data:
+  ACCOUNT: myco
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_REGION: us-west-2
+  BOTO_MAX_ATTEMPTS: "3"
+  OK_PORTS: 22,80,443
+  S3_BUCKET: myco-cloudmapper
+  SES_ENABLED: "true"
+  SES_RECIPIENT: sysadmin@myco.com
+  SES_SENDER: cloudmapper@myco.com

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -e
+shopt -s extglob
+
+# ref:
+# https://github.com/duo-labs/cloudmapper
+# https://github.com/manheim/manheim-cloudmapper
+
+# we use a global monolithic 'tfvars' file for IAC projects for terraform and kubernetes vars so we can instead just set vars explicity below.
+#TFVARS="$1"
+#MANHEIM_CLOUDMAPPER_VERSION=$(awk -F "= " '/manheim_cloudmapper_version/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_REPO_REGION=$(awk -F "= " '/manheim_cloudmapper_repo_region/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_CRON_SCHEDULE=$(awk -F "= " '/manheim_cloudmapper_cron_schedule/ {print $2}' ${TFVARS} | sed 's/"//g')
+#
+#MANHEIM_CLOUDMAPPER_ACCOUNT=$(awk -F "= " '/manheim_cloudmapper_account/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_VERSION=$(awk -F "= " '/manheim_cloudmapper_version/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_AWS_DEFAULT_REGION=$(awk -F "= " '/manheim_cloudmapper_aws_default_region/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_AWS_REGION=$(awk -F "= " '/manheim_cloudmapper_aws_region/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_BOTO_MAX_ATTEMPTS=$(awk -F "= " '/manheim_cloudmapper_boto_max_attempts/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_OK_PORTS=$(awk -F "= " '/manheim_cloudmapper_ok_ports/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_S3_BUCKET=$(awk -F "= " '/manheim_cloudmapper_s3_bucket/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_SES_ENABLED=$(awk -F "= " '/manheim_cloudmapper_ses_enabled/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_SES_RECIPIENT=$(awk -F "= " '/manheim_cloudmapper_ses_recipient/ {print $2}' ${TFVARS} | sed 's/"//g')
+#MANHEIM_CLOUDMAPPER_SES_SENDER=$(awk -F "= " '/manheim_cloudmapper_ses_sender/ {print $2}' ${TFVARS} | sed 's/"//g')
+
+# manheim_cloudmapper dockerized cloudmapper project
+# this should be a git tag and also specified in `manheim_cloudmapper/version.py`
+MANHEIM_CLOUDMAPPER_VERSION = "0.2.5"
+MANHEIM_CLOUDMAPPER_REPO_REGION = "us-west-2"
+# NOTE:
+# All CronJob schedule times are based on the timezone of the kube-controller-manager.
+# If your control plane runs the kube-controller-manager in Pods or bare containers, the timezone set for the kube-controller-manager container determines the timezone that the cron job controller uses.
+# default is 7AM UTC = 12AM PDT
+MANHEIM_CLOUDMAPPER_CRON_SCHEDULE = "15 7 * * 6"
+MANHEIM_CLOUDMAPPER_ACCOUNT = "myco"
+MANHEIM_CLOUDMAPPER_AWS_DEFAULT_REGION = "us-east-1"
+MANHEIM_CLOUDMAPPER_AWS_REGION = "us-west-2"
+MANHEIM_CLOUDMAPPER_BOTO_MAX_ATTEMPTS = "3"
+MANHEIM_CLOUDMAPPER_OK_PORTS = "22,80,443"
+MANHEIM_CLOUDMAPPER_S3_BUCKET = "myco-cloudmapper"
+MANHEIM_CLOUDMAPPER_SES_ENABLED = "true"
+MANHEIM_CLOUDMAPPER_SES_RECIPIENT = "sysadmin@myco.com"
+MANHEIM_CLOUDMAPPER_SES_SENDER = "cloudmapper@myco.com"
+
+echo
+echo "MANHEIM_CLOUDMAPPER_ACCOUNT: $MANHEIM_CLOUDMAPPER_ACCOUNT"
+echo "MANHEIM_CLOUDMAPPER_VERSION: $MANHEIM_CLOUDMAPPER_VERSION"
+echo "MANHEIM_CLOUDMAPPER_CRON_SCHEDULE: $MANHEIM_CLOUDMAPPER_CRON_SCHEDULE"
+echo "MANHEIM_CLOUDMAPPER_S3_BUCKET: $MANHEIM_CLOUDMAPPER_S3_BUCKET"
+echo "MANHEIM_CLOUDMAPPER_REPO_REGION: $MANHEIM_CLOUDMAPPER_REPO_REGION"
+echo "MANHEIM_CLOUDMAPPER_AWS_DEFAULT_REGION: $MANHEIM_CLOUDMAPPER_AWS_DEFAULT_REGION"
+echo "MANHEIM_CLOUDMAPPER_AWS_REGION: $MANHEIM_CLOUDMAPPER_AWS_REGION"
+echo "MANHEIM_CLOUDMAPPER_BOTO_MAX_ATTEMPTS: $MANHEIM_CLOUDMAPPER_BOTO_MAX_ATTEMPTS"
+echo "MANHEIM_CLOUDMAPPER_OK_PORTS: $MANHEIM_CLOUDMAPPER_OK_PORTS"
+echo "MANHEIM_CLOUDMAPPER_SES_ENABLED: $MANHEIM_CLOUDMAPPER_SES_ENABLED"
+echo "MANHEIM_CLOUDMAPPER_SES_RECIPIENT: $MANHEIM_CLOUDMAPPER_SES_RECIPIENT"
+echo "MANHEIM_CLOUDMAPPER_SES_SENDERSES SENDER $MANHEIM_CLOUDMAPPER_SES_SENDER"
+echo
+
+aws ecr create-repository --repository-name k8s/manheim-cloudmapper --image-tag-mutability MUTABLE && true
+
+rm -rf ./manifests && mkdir ./manifests
+rm -rf ./td-manheim-cloudmapper # JIC exists from failed previous execution or manual run etc.
+
+git clone git@github.com:myco/td-manheim-cloudmapper.git
+
+cp ./secrets/* ./td-manheim-cloudmapper
+
+cd ./td-manheim-cloudmapper
+
+git fetch --tags
+
+git checkout $MANHEIM_CLOUDMAPPER_VERSION
+
+# we use their docker image build process--which builds and tags like so:
+# `docker build --build-arg git_version=dacce53 --build-arg cloudmapper_version=0.2.5 --no-cache -t manheim/manheim-cloudmapper:test_dacce53_1592520154 .`
+./build_or_deploy.sh dockerbuildtest
+
+docker images --filter "label=org.opencontainers.image.revision=${MANHEIM_CLOUDMAPPER_VERSION}"
+#REPOSITORY                    TAG                       IMAGE ID            CREATED             SIZE
+#manheim/manheim-cloudmapper   test_dacce53_1592520154   5b86990f71bb        40 minutes ago      1.28GB
+
+DOCKER_IMAGE_ID=$(docker images --filter "label=org.opencontainers.image.revision=${MANHEIM_CLOUDMAPPER_VERSION}" | head -2 | grep -v 'REPOSITORY' | awk '{print $3}') && echo $DOCKER_IMAGE_ID
+#5b86990f71bb
+
+# create requisite meaningful tags (Note that for us internally we use k8s/project for kube images)
+docker tag $DOCKER_IMAGE_ID manheim/manheim-cloudmapper:${MANHEIM_CLOUDMAPPER_VERSION}
+docker tag $DOCKER_IMAGE_ID k8s/manheim-cloudmapper:${MANHEIM_CLOUDMAPPER_VERSION}
+docker tag $DOCKER_IMAGE_ID "01234567890.dkr.ecr.${MANHEIM_CLOUDMAPPER_REPO_REGION}.amazonaws.com/k8s/manheim-cloudmapper:${MANHEIM_CLOUDMAPPER_VERSION}"
+
+COMMAND=$(aws --region ${MANHEIM_CLOUDMAPPER_REPO_REGION} ecr get-login-password | docker login --username AWS --password-stdin 01234567890.dkr.ecr.us-west-2.amazonaws.com)
+
+docker push "01234567890.dkr.ecr.${MANHEIM_CLOUDMAPPER_REPO_REGION}.amazonaws.com/k8s/manheim-cloudmapper:${MANHEIM_CLOUDMAPPER_VERSION}"
+
+# show the most recent five images
+aws ecr list-images --repository-name k8s/manheim-cloudmapper --profile AmazonEC2ContainerRegistryReadOnly | grep 'imageTag' | awk -F ":" '{print $2}' | sed 's/"//g; s/,//g' | sort -f -t . -k 1,1 -k 2,2n -k 3,3n -k 4,4n | tail -5; printf "\n"
+
+cd ../
+
+mkdir -p ./manifests
+
+# dynamic cron manifest creation from template file using variables
+set -o noglob # needed to prevent crontab schedule with '*' expanding into local files in dir
+sed -e "s#__MANHEIM_CLOUDMAPPER_CRON_SCHEDULE__#${MANHEIM_CLOUDMAPPER_CRON_SCHEDULE}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_VERSION__#${MANHEIM_CLOUDMAPPER_VERSION}#g" ./templates/cron.yaml.tpl > ./manifests/06-cron.yaml
+
+# dynamic configmap manifest creation from template file using variables
+sed -e "s#__MANHEIM_CLOUDMAPPER_ACCOUNT__#${MANHEIM_CLOUDMAPPER_ACCOUNT}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_VERSION__#${MANHEIM_CLOUDMAPPER_VERSION}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_AWS_DEFAULT_REGION__#${MANHEIM_CLOUDMAPPER_AWS_DEFAULT_REGION}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_AWS_REGION__#${MANHEIM_CLOUDMAPPER_AWS_REGION}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_BOTO_MAX_ATTEMPTS__#${MANHEIM_CLOUDMAPPER_BOTO_MAX_ATTEMPTS}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_OK_PORTS__#${MANHEIM_CLOUDMAPPER_OK_PORTS}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_S3_BUCKET__#${MANHEIM_CLOUDMAPPER_S3_BUCKET}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_SES_ENABLED__#${MANHEIM_CLOUDMAPPER_SES_ENABLED}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_SES_RECIPIENT__#${MANHEIM_CLOUDMAPPER_SES_RECIPIENT}#g" \
+-e "s#__MANHEIM_CLOUDMAPPER_SES_SENDER__#${MANHEIM_CLOUDMAPPER_SES_SENDER}#g" ./templates/configmap.yaml.tpl > ./manifests/02-configmap.yaml
+
+rm -fr td-manheim-cloudmapper

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# we do this here in the apply when there are no secrets in which case there would be no executing $namespace.secret
+#kubectl create ns cloudmapper && true
+
+# delete existing and (re)create secrets from git-crypt encrypted protected file
+./secrets/cloudmapper.secret
+
+kubectl apply --recursive -f ./manifests -n cloudmapper

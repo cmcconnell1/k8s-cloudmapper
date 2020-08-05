@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -e
+shopt -s extglob
+
+TFVARS="$1"
+
+NAMESPACE=default
+
+MANIFEST_PATH=./manifests
+
+testpath() {
+	local path=$1
+	if ! test -d $path
+	then echo "!!! Not found: ${path}" && exit 1
+	fi
+}
+
+testpath $MANIFEST_PATH
+
+for i in `seq 1 10`; do \
+kubectl delete -n $NAMESPACE --recursive -f $MANIFEST_PATH -n cloudmapper && break || \
+sleep 10; \
+done; \

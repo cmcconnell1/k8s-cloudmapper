@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cloudmapper
+  namespace: cloudmapper
+spec:
+  template:
+    spec:
+      containers:
+      - name: cloudmapper-job
+        image: "01234567890.dkr.ecr.us-west-2.amazonaws.com/k8s/manheim-cloudmapper:0.2.5"
+        envFrom:
+          - configMapRef:
+              name: "cloudmapper-config"
+          - secretRef:
+              name: "cloudmapper-secrets"
+        command: ["/opt/manheim_cloudmapper/cloudmapper.sh"]
+      restartPolicy: Never
+  backoffLimit: 4

@@ -1,0 +1,4 @@
+secretfile filter=git-crypt diff=git-crypt
+*.secret filter=git-crypt diff=git-crypt
+*.secrets filter=git-crypt diff=git-crypt
+config.json filter=git-crypt diff=git-crypt
